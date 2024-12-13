@@ -1,101 +1,175 @@
-import Image from "next/image";
+"use client";
+import Button from "@/components/Button";
+import LogoutIcon from "@/components/icons/LogoutIcon";
+import Logo from "@/components/Logo";
+import NewTaskForm from "@/components/NewTaskForm";
+import ResponsiveContainer from "@/components/ResponsiveContainer";
+import Task from "@/components/Task";
+import Title from "@/components/Title";
+import { axiosInstance } from "@/services";
+import { AppDispatch, AppState } from "@/store";
+import { resetTasks } from "@/store/slices/tasksSlice";
+import { logout } from "@/store/slices/userSlice";
+import { getTasksThunk } from "@/store/thunks/tasksThunks";
+import {
+  FormControl,
+  IconButton,
+  InputLabel,
+  LinearProgress,
+  MenuItem,
+  Modal,
+  Select,
+} from "@mui/material";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [addingTask, setAddingTask] = useState(false);
+  const [sortBy, setSortBy] = useState<SortType>("marked");
+  const [statusFilter, setStatusFilter] = useState<StatusType>("all");
+  const [tasks, setTasks] = useState<Task[]>([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const { userData } = useSelector((state: AppState) => state.user);
+  const {
+    tasks: allTasks,
+    listLoading,
+    loading,
+  } = useSelector((state: AppState) => state.tasks);
+
+  const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+
+  useEffect(() => {
+    if (userData?.token) {
+      axiosInstance.defaults.headers.common[
+        "Authorization"
+      ] = `Bearer ${userData?.token}`;
+      dispatch(getTasksThunk());
+    } else {
+      axiosInstance.defaults.headers.common["Authorization"] = undefined;
+      router.replace("/login");
+    }
+  }, [userData?.token]);
+
+  useEffect(() => {
+    if (userData === null) {
+      router.replace("/auth");
+    }
+  }, [userData]);
+
+  const handleLogout = () => {
+    dispatch(logout());
+    dispatch(resetTasks());
+  };
+
+  const closeAddingModal = () => {
+    setAddingTask(false);
+  };
+
+  useEffect(() => {
+    if (!!allTasks) {
+      const filteredTasks: Task[] = allTasks.filter((task) => {
+        switch (statusFilter) {
+          case "all":
+            return true;
+          case "marked":
+            return task.completed;
+          case "unmarked":
+            return !task.completed;
+          default:
+            return false;
+        }
+      });
+      const sortedTasks = [...filteredTasks].sort((a, b) => {
+        if (sortBy === "date") {
+          return (
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+        }
+        if (sortBy === "title") {
+          return a.title.localeCompare(b.title);
+        }
+        if (sortBy === "marked") {
+          return Number(a.completed) - Number(b.completed);
+        }
+        return 0;
+      });
+      setTasks(sortedTasks);
+    }
+  }, [statusFilter, sortBy, allTasks]);
+
+  return (
+    <div>
+      <div className="flex h-20 w-full items-center justify-between gap-10 bg-white px-32 shadow lg:gap-6 lg:px-16 md:gap-4 md:px-8 sm:gap-4 sm:px-4">
+        <Logo />
+        <div className="flex items-center gap-4">
+          <h1 className="font-medium cursor-default text-end">
+            {userData?.name}
+          </h1>
+          <IconButton onClick={handleLogout}>
+            <LogoutIcon className="rotate-180" />
+          </IconButton>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
+      {listLoading && <LinearProgress />}
+      <ResponsiveContainer className="flex flex-col gap-4">
+        <div className="flex items-center gap-4 md:flex-col">
+          <Title className="text-primary-900 text-3xl">Tasks</Title>
+          {!!allTasks.length && (
+            <div className="flex items-center gap-4 grow justify-end md:order-3">
+              <FormControl className="w-32">
+                <InputLabel id="sort-select-label">Sort by</InputLabel>
+                <Select
+                  labelId="sort-select-label"
+                  label="Sort by"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortType)}
+                >
+                  <MenuItem value="date">Date</MenuItem>
+                  <MenuItem value="title">Title</MenuItem>
+                  <MenuItem value="marked">Marked</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl className="w-32">
+                <InputLabel id="status-select-label">Status</InputLabel>
+                <Select
+                  labelId="status-select-label"
+                  label="Status"
+                  value={statusFilter}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as StatusType)
+                  }
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="marked">Marked</MenuItem>
+                  <MenuItem value="unmarked">Unmarked</MenuItem>
+                </Select>
+              </FormControl>
+            </div>
+          )}
+          <Button
+            className="ms-auto md:ms-0 md:order-2"
+            onClick={() => setAddingTask(true)}
+          >
+            New
+          </Button>
+        </div>
+        <div className="flex flex-col gap-4">
+          {!!allTasks.length ? (
+            tasks.map((task) => <Task key={task.id} task={task} />)
+          ) : (
+            <Title className="mx-auto">No tasks to show!</Title>
+          )}
+        </div>
+      </ResponsiveContainer>
+      <Modal
+        className="flex items-center justify-center"
+        open={addingTask}
+        onClose={closeAddingModal}
+      >
+        <NewTaskForm closeModal={closeAddingModal} loading={loading} />
+      </Modal>
     </div>
   );
 }
